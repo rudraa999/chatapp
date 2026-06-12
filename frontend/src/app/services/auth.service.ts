@@ -21,13 +21,70 @@ export class AuthService {
   // Cache the decrypted ECDH private key in memory (never written to disk)
   private userPrivateKey: CryptoKey | null = null;
   private restorePromise: Promise<void>;
+  private authChannel = new BroadcastChannel('uchat_auth_sync');
 
   constructor(
     private http: HttpClient,
     private cryptoService: CryptoService
   ) {
     console.log('[AuthService] Initializing and restoring private key...');
+    this.setupAuthChannel();
     this.restorePromise = this.restorePrivateKey();
+  }
+
+  private setupAuthChannel() {
+    this.authChannel.onmessage = async (event) => {
+      const { type, username, privateKeyJwk } = event.data;
+      const currentUsername = this.getUsername();
+      
+      if (type === 'REQUEST_PRIVATE_KEY' && username === currentUsername) {
+        const cachedJwk = sessionStorage.getItem('chat_private_key');
+        if (cachedJwk) {
+          console.log('[AuthService] Sharing private key with a new tab request...');
+          this.authChannel.postMessage({
+            type: 'RESPONSE_PRIVATE_KEY',
+            username: currentUsername,
+            privateKeyJwk: JSON.parse(cachedJwk)
+          });
+        }
+      }
+    };
+  }
+
+  private requestPrivateKeyFromOtherTabs(): Promise<any> {
+    return new Promise((resolve) => {
+      const username = this.getUsername();
+      if (!username) {
+        resolve(null);
+        return;
+      }
+
+      const handleResponse = (event: MessageEvent) => {
+        const { type, username: respUsername, privateKeyJwk } = event.data;
+        if (type === 'RESPONSE_PRIVATE_KEY' && respUsername === username && privateKeyJwk) {
+          console.log('[AuthService] Received private key from another tab.');
+          cleanup();
+          resolve(privateKeyJwk);
+        }
+      };
+
+      const timer = setTimeout(() => {
+        console.log('[AuthService] Request for private key from other tabs timed out.');
+        cleanup();
+        resolve(null);
+      }, 500); // Wait 500ms for other tabs to respond
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.authChannel.removeEventListener('message', handleResponse);
+      };
+
+      this.authChannel.addEventListener('message', handleResponse);
+      this.authChannel.postMessage({
+        type: 'REQUEST_PRIVATE_KEY',
+        username
+      });
+    });
   }
 
   public async waitForInit(): Promise<void> {
@@ -35,8 +92,17 @@ export class AuthService {
   }
 
   private async restorePrivateKey(): Promise<void> {
-    const cachedJwk = sessionStorage.getItem('chat_private_key');
+    let cachedJwk = sessionStorage.getItem('chat_private_key');
     console.log('[AuthService] Cached private key in sessionStorage present:', !!cachedJwk);
+    
+    if (!cachedJwk && this.getToken() && this.getUsername()) {
+      console.log('[AuthService] Private key not in sessionStorage but token exists. Requesting from other tabs...');
+      const sharedJwk = await this.requestPrivateKeyFromOtherTabs();
+      if (sharedJwk) {
+        cachedJwk = JSON.stringify(sharedJwk);
+      }
+    }
+
     if (cachedJwk) {
       try {
         const jwk = JSON.parse(cachedJwk);
@@ -50,12 +116,13 @@ export class AuthService {
           true,
           ['deriveKey', 'deriveBits']
         );
-        console.log('[AuthService] Private key successfully restored from sessionStorage.');
+        sessionStorage.setItem('chat_private_key', cachedJwk);
+        console.log('[AuthService] Private key successfully restored.');
       } catch (e) {
-        console.error('[AuthService] Failed to restore private key from session storage', e);
+        console.error('[AuthService] Failed to restore private key', e);
       }
     } else {
-      console.warn('[AuthService] No private key found in sessionStorage.');
+      console.warn('[AuthService] No private key found.');
     }
   }
 
