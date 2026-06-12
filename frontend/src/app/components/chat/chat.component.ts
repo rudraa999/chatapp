@@ -19,6 +19,7 @@ import { startWith } from 'rxjs/operators';
 export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
   @ViewChild('fileInput') fileInput!: ElementRef;
+  @ViewChild('messageInput') messageInput!: ElementRef<HTMLInputElement>;
 
   messages: ChatMessage[] = [];
   newMessage = '';
@@ -244,6 +245,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.chatService.sendPrivateMessage(this.activeChat, friendObj.publicKey, this.newMessage.trim());
     }
     this.newMessage = '';
+
+    // Maintain focus on the input to keep the mobile keyboard open
+    setTimeout(() => {
+      this.messageInput?.nativeElement?.focus();
+    }, 50);
   }
 
   // Trigger file selection
