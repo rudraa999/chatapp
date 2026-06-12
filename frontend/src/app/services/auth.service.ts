@@ -9,7 +9,13 @@ import { CryptoService } from './crypto.service';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8080/api/auth';
+  private getApiUrl(): string {
+    const base = (window.location.hostname === 'localhost' && window.location.port === '4200')
+      ? 'http://localhost:8080'
+      : window.location.origin;
+    return base + '/api/auth';
+  }
+  private apiUrl = this.getApiUrl();
   private loggedInUser = new BehaviorSubject<string | null>(localStorage.getItem('chat_username'));
   
   // Cache the decrypted ECDH private key in memory (never written to disk)

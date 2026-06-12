@@ -7,7 +7,13 @@ import { UserSearchResponse, PendingRequest } from '../models/chat.model';
   providedIn: 'root'
 })
 export class FriendService {
-  private apiUrl = 'http://localhost:8080/api';
+  private getApiUrl(): string {
+    const base = (window.location.hostname === 'localhost' && window.location.port === '4200')
+      ? 'http://localhost:8080'
+      : window.location.origin;
+    return base + '/api';
+  }
+  private apiUrl = this.getApiUrl();
 
   constructor(private http: HttpClient) {}
 

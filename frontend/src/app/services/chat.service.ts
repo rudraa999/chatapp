@@ -21,7 +21,13 @@ export class ChatService {
   private messageReceivedSubject = new Subject<ChatMessage>();
   public messageReceived$: Observable<ChatMessage> = this.messageReceivedSubject.asObservable();
 
-  private apiUrl = 'http://localhost:8080/api/chat';
+  private getApiUrl(): string {
+    const base = (window.location.hostname === 'localhost' && window.location.port === '4200')
+      ? 'http://localhost:8080'
+      : window.location.origin;
+    return base + '/api/chat';
+  }
+  private apiUrl = this.getApiUrl();
 
   // Cache derived AES shared keys in memory
   private sharedSecrets: { [username: string]: CryptoKey } = {};
@@ -125,7 +131,9 @@ export class ChatService {
 
     // Configure STOMP Client
     this.stompClient = new Client({
-      brokerURL: 'ws://localhost:8080/ws',
+      brokerURL: (window.location.hostname === 'localhost' && window.location.port === '4200')
+        ? 'ws://localhost:8080/ws'
+        : ((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws'),
       connectHeaders: {
         Authorization: `Bearer ${token}`
       },
