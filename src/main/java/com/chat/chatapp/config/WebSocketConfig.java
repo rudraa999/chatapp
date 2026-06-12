@@ -2,6 +2,8 @@ package com.chat.chatapp.config;
 
 import com.chat.chatapp.security.JwtUtils;
 import com.chat.chatapp.security.UserDetailsServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -26,6 +28,8 @@ import java.util.List;
 @EnableWebSocketMessageBroker
 @Order(Ordered.HIGHEST_PRECEDENCE + 99)
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private static final Logger logger = LoggerFactory.getLogger(WebSocketConfig.class);
 
     @Autowired
     private JwtUtils jwtUtils;
@@ -57,20 +61,40 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 StompHeaderAccessor accessor =
                         MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-                if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-                    List<String> authorization = accessor.getNativeHeader("Authorization");
-                    if (authorization != null && !authorization.isEmpty()) {
-                        String bearerToken = authorization.get(0);
-                        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-                            String jwt = bearerToken.substring(7);
-                            if (jwtUtils.validateJwtToken(jwt)) {
-                                String username = jwtUtils.getUserNameFromJwtToken(jwt);
-                                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                                UsernamePasswordAuthenticationToken authentication =
-                                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                                accessor.setUser(authentication);
+                if (accessor != null) {
+                    StompCommand cmd = accessor.getCommand();
+                    if (StompCommand.CONNECT.equals(cmd)) {
+                        logger.info("WebSocket: CONNECT frame received");
+                        List<String> authorization = accessor.getNativeHeader("Authorization");
+                        if (authorization != null && !authorization.isEmpty()) {
+                            String bearerToken = authorization.get(0);
+                            if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+                                String jwt = bearerToken.substring(7);
+                                if (jwtUtils.validateJwtToken(jwt)) {
+                                    String username = jwtUtils.getUserNameFromJwtToken(jwt);
+                                    logger.info("WebSocket: JWT validated successfully for user: {}", username);
+                                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                                    UsernamePasswordAuthenticationToken authentication =
+                                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                                    accessor.setUser(authentication);
+                                    logger.info("WebSocket: User set on accessor: {}", accessor.getUser() != null ? accessor.getUser().getName() : "null");
+                                } else {
+                                    logger.warn("WebSocket: JWT validation failed");
+                                }
+                            } else {
+                                logger.warn("WebSocket: Authorization header format invalid (expected 'Bearer <token>')");
                             }
+                        } else {
+                            logger.warn("WebSocket: Authorization header missing in CONNECT frame");
                         }
+                    } else if (StompCommand.SUBSCRIBE.equals(cmd)) {
+                        logger.info("WebSocket: SUBSCRIBE frame received for destination: {} by user: {}", 
+                                accessor.getDestination(), 
+                                accessor.getUser() != null ? accessor.getUser().getName() : "anonymous");
+                    } else if (StompCommand.SEND.equals(cmd)) {
+                        logger.info("WebSocket: SEND frame received for destination: {} by user: {}", 
+                                accessor.getDestination(), 
+                                accessor.getUser() != null ? accessor.getUser().getName() : "anonymous");
                     }
                 }
                 return message;
@@ -78,3 +102,4 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         });
     }
 }
+

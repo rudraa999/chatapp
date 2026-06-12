@@ -15,11 +15,24 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(columnDefinition = "TEXT", nullable = true)
+    private String publicKey;
+
+    @Column(columnDefinition = "TEXT", nullable = true)
+    private String encryptedPrivateKey;
+
     public User() {}
 
     public User(String username, String password) {
         this.username = username;
         this.password = password;
+    }
+
+    public User(String username, String password, String publicKey, String encryptedPrivateKey) {
+        this.username = username;
+        this.password = password;
+        this.publicKey = publicKey;
+        this.encryptedPrivateKey = encryptedPrivateKey;
     }
 
     public Long getId() {
@@ -44,5 +57,21 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getPublicKey() {
+        return publicKey;
+    }
+
+    public void setPublicKey(String publicKey) {
+        this.publicKey = publicKey;
+    }
+
+    public String getEncryptedPrivateKey() {
+        return encryptedPrivateKey;
+    }
+
+    public void setEncryptedPrivateKey(String encryptedPrivateKey) {
+        this.encryptedPrivateKey = encryptedPrivateKey;
     }
 }

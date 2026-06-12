@@ -1,0 +1,59 @@
+<div class="login-wrapper">
+  <div class="glass-panel login-card">
+    <div class="logo-area">
+      <div class="logo-icon">💬</div>
+      <h1 class="app-title">UChat</h1>
+      <p class="subtitle">Secure Realtime Messaging</p>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" #loginForm="ngForm" class="login-form">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <div class="input-container">
+          <span class="input-icon">👤</span>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            [(ngModel)]="username" 
+            required 
+            placeholder="Enter username" 
+            class="form-input" 
+            autocomplete="off"
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-container">
+          <span class="input-icon">🔒</span>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            [(ngModel)]="password" 
+            required 
+            placeholder="Enter password" 
+            class="form-input"
+          />
+        </div>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-banner">
+        <span class="error-icon">⚠️</span>
+        <span class="error-text">{{ errorMessage }}</span>
+      </div>
+
+      <button type="submit" [disabled]="isLoading" class="btn-primary">
+        <span *ngIf="!isLoading">Sign In</span>
+        <span *ngIf="isLoading" class="spinner"></span>
+      </button>
+
+      <div class="form-footer">
+        <span>New to UChat? </span>
+        <a (click)="goToRegister()" class="interactive-link">Create an account</a>
+      </div>
+    </form>
+  </div>
+</div>

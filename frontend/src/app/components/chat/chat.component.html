@@ -1,0 +1,284 @@
+<div class="chat-container" [ngClass]="{'chat-selected': activeChat}">
+  <!-- Sidebar Panel -->
+  <aside class="glass-panel sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <span class="logo-icon">💬</span>
+        <h2>UChat</h2>
+      </div>
+      <div class="connection-status" [ngClass]="{'connected': isConnected}">
+        <span class="status-dot"></span>
+        <span class="status-text">{{ isConnected ? 'Connected' : 'Connecting...' }}</span>
+      </div>
+    </div>
+
+    <!-- User Search Box -->
+    <div class="search-box-container">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          placeholder="Search by username..." 
+          [(ngModel)]="searchQuery" 
+          (ngModelChange)="onSearchChange()" 
+          class="form-input search-input" 
+          autocomplete="off"
+        />
+        <button *ngIf="searchQuery" (click)="searchQuery = ''; onSearchChange()" class="btn-clear-search">✕</button>
+      </div>
+    </div>
+
+    <!-- Search Results Overlay List -->
+    <div *ngIf="searchQuery.trim()" class="search-results-panel">
+      <h3 class="section-title">Search Results</h3>
+      <div class="search-results-list">
+        <div *ngFor="let result of searchResults" class="search-item">
+          <div class="user-info-group">
+            <div class="user-avatar" [style.background-color]="getAvatarColor(result.username)">
+              {{ result.username.substring(0, 2).toUpperCase() }}
+            </div>
+            <span class="username">{{ result.username }}</span>
+          </div>
+          <div class="search-actions">
+            <!-- Add Friend -->
+            <button *ngIf="result.relationStatus === 'NONE'" 
+                    (click)="sendFriendRequest(result.username)" 
+                    class="btn-action btn-add-friend" 
+                    title="Send Friend Request">
+              Add +
+            </button>
+            <!-- Pending Sent -->
+            <span *ngIf="result.relationStatus === 'PENDING' && result.relationSender === currentUser" 
+                  class="badge-status pending-sent">
+              Sent
+            </span>
+            <!-- Pending Received / Accept -->
+            <button *ngIf="result.relationStatus === 'PENDING' && result.relationSender !== currentUser" 
+                    (click)="acceptFriendRequest(result.requestId!)" 
+                    class="btn-action btn-accept" 
+                    title="Accept Request">
+              Accept
+            </button>
+            <!-- Friends -->
+            <span *ngIf="result.relationStatus === 'ACCEPTED'" 
+                  class="badge-status already-friends">
+              Friends
+            </span>
+          </div>
+        </div>
+        <div *ngIf="searchResults.length === 0" class="no-results">
+          No users found matching "{{ searchQuery }}"
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Navigation / Chats List (Only shown when not searching) -->
+    <div *ngIf="!searchQuery.trim()" class="active-users-section">
+      
+      <!-- Pending Friend Invites Section -->
+      <div *ngIf="pendingRequests.length > 0" class="pending-requests-section">
+        <h3 class="section-title pending-title">Invites ({{ pendingRequests.length }})</h3>
+        <div class="pending-list">
+          <div *ngFor="let req of pendingRequests" class="pending-item">
+            <span class="invite-text">From: <strong>{{ req.sender }}</strong></span>
+            <div class="invite-actions">
+              <button (click)="acceptFriendRequest(req.id)" class="btn-invite btn-invite-accept" title="Accept">✓</button>
+              <button (click)="declineFriendRequest(req.id)" class="btn-invite btn-invite-decline" title="Decline">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Friends List Section -->
+      <div class="friends-section">
+        <h3 class="section-title">Direct Messages</h3>
+        <div class="users-list">
+          <div *ngFor="let friend of friends" 
+               class="user-item clickable" 
+               [ngClass]="{'active': activeChat === friend.username}" 
+               (click)="switchChat(friend.username)">
+            <div class="user-avatar" [style.background-color]="getAvatarColor(friend.username)">
+              {{ friend.username.substring(0, 2).toUpperCase() }}
+            </div>
+            <span class="username">{{ friend.username }}</span>
+            <span *ngIf="unreadFriends[friend.username]" class="unread-dot"></span>
+          </div>
+          <div *ngIf="friends.length === 0" class="no-friends-prompt">
+            Add friends using the search bar to start messaging.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Current User Profile Footer -->
+    <div class="sidebar-footer">
+      <div class="profile-info">
+        <div class="user-avatar current-avatar" [style.background-color]="getAvatarColor(currentUser)">
+          {{ currentUser.substring(0, 2).toUpperCase() }}
+        </div>
+        <div class="profile-meta">
+          <span class="profile-name">{{ currentUser }}</span>
+          <span class="profile-role">Online</span>
+        </div>
+      </div>
+      <button (click)="logout()" class="btn-logout" title="Sign Out">
+        Sign Out ➔
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Chat Workspace -->
+  <main *ngIf="activeChat; else welcomeScreen" class="chat-workspace">
+    <!-- Chat Header -->
+    <header class="glass-panel chat-header">
+      <div class="header-info">
+        <button class="btn-back" (click)="switchChat('')" title="Back to members">
+          ← Back
+        </button>
+        <div class="header-user-avatar" [style.background-color]="getAvatarColor(activeChat)">
+          {{ activeChat.substring(0, 2).toUpperCase() }}
+        </div>
+        <div class="channel-details">
+          <h2>{{ activeChat }} <span class="lock-indicator" title="End-to-End Encrypted">🔒</span></h2>
+          <p>Private Conversation</p>
+        </div>
+      </div>
+      <button class="btn-clear-chat" (click)="clearActiveChat()" title="Clear Chat History">
+        🗑️
+      </button>
+    </header>
+
+    <!-- Messages Container -->
+    <div class="messages-container" #scrollContainer>
+      <div *ngFor="let msg of messages" class="message-row" 
+           [ngClass]="{
+             'self-message': msg.sender === currentUser && (msg.type === 'CHAT' || msg.type === 'FILE'), 
+             'other-message': msg.sender !== currentUser && (msg.type === 'CHAT' || msg.type === 'FILE')
+           }">
+
+        <!-- Chat and File messages -->
+        <ng-container *ngIf="msg.type === 'CHAT' || msg.type === 'FILE'">
+          <div *ngIf="msg.sender !== currentUser" class="message-avatar" [style.background-color]="getAvatarColor(msg.sender)">
+            {{ msg.sender.substring(0, 2).toUpperCase() }}
+          </div>
+          
+          <div class="message-bubble-wrapper">
+            <span *ngIf="msg.sender !== currentUser" class="message-sender-name">{{ msg.sender }}</span>
+            <div class="bubble-container">
+              <div class="message-bubble" [ngClass]="{'file-bubble': msg.type === 'FILE'}">
+                
+                <!-- Plain text message -->
+                <p *ngIf="msg.type === 'CHAT'" class="message-content">{{ msg.content }}</p>
+                
+                <!-- File / Image / Video / PDF message -->
+                <div *ngIf="msg.type === 'FILE'" class="file-content-container">
+                  <!-- If file metadata is loading -->
+                  <div *ngIf="!getDecryptedFile(msg.id) || getDecryptedFile(msg.id)!.loading" class="file-loader">
+                    <span class="loader-spinner">🔄</span>
+                    <span>Decrypting attachment...</span>
+                  </div>
+                  
+                  <!-- If file decryption failed -->
+                  <div *ngIf="getDecryptedFile(msg.id)?.error" class="file-error">
+                    <span class="error-icon">⚠️</span>
+                    <span>Failed to decrypt attachment.</span>
+                  </div>
+                  
+                  <!-- If file decrypted successfully -->
+                  <div *ngIf="getDecryptedFile(msg.id) && !getDecryptedFile(msg.id)!.loading && !getDecryptedFile(msg.id)!.error">
+                    <ng-container *ngIf="getDecryptedFile(msg.id) as decFile">
+                      <!-- Images -->
+                      <div *ngIf="decFile.type.startsWith('image/')" class="media-preview-container">
+                        <img [src]="decFile.url" [alt]="decFile.name" class="media-preview image-preview" />
+                        <div class="media-caption">
+                          <span class="media-name" [title]="decFile.name">{{ decFile.name }}</span>
+                          <a [href]="decFile.url" [download]="decFile.name" class="btn-download-media" title="Download">⬇️</a>
+                        </div>
+                      </div>
+
+                      <!-- Videos -->
+                      <div *ngIf="decFile.type.startsWith('video/')" class="media-preview-container">
+                        <video [src]="decFile.url" controls class="media-preview video-preview"></video>
+                        <div class="media-caption">
+                          <span class="media-name" [title]="decFile.name">{{ decFile.name }}</span>
+                          <a [href]="decFile.url" [download]="decFile.name" class="btn-download-media" title="Download">⬇️</a>
+                        </div>
+                      </div>
+
+                      <!-- Generic Files / PDFs / Docs -->
+                      <div *ngIf="!decFile.type.startsWith('image/') && !decFile.type.startsWith('video/')" class="file-card">
+                        <div class="file-card-info">
+                          <span class="file-card-icon">
+                            {{ decFile.type.includes('pdf') ? '📄' : '📁' }}
+                          </span>
+                          <div class="file-card-meta">
+                            <span class="file-name" [title]="decFile.name">{{ decFile.name }}</span>
+                            <span class="file-size">{{ (decFile.size / 1024) | number:'1.0-1' }} KB</span>
+                          </div>
+                        </div>
+                        <a [href]="decFile.url" [download]="decFile.name" class="btn-download-file" title="Download File">
+                          Download ➔
+                        </a>
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+
+                <!-- Message Timestamp -->
+                <span class="message-time">
+                  {{ msg.timestamp ? (msg.timestamp | date:'shortTime') : 'Just now' }}
+                </span>
+              </div>
+              <button *ngIf="msg.sender === currentUser && msg.id" (click)="deleteMessage(msg.id)" class="btn-delete-msg" title="Delete Message">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
+      
+      <!-- Empty private chat prompt -->
+      <div *ngIf="messages.length === 0" class="empty-chat-prompt">
+        <span class="empty-chat-icon">🔒</span>
+        <h3>This is the beginning of your E2E encrypted conversation with {{ activeChat }}</h3>
+        <p>Your keys are derived locally. Messages are encrypted before hitting the database.</p>
+      </div>
+    </div>
+
+    <!-- Message Input Bar -->
+    <footer class="glass-panel chat-input-area">
+      <form (ngSubmit)="sendMessage()" class="chat-form">
+        <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;" />
+        <button type="button" class="btn-attach" (click)="triggerFileInput()" [disabled]="!isConnected" title="Attach file, image, video or PDF">
+          📎
+        </button>
+        <input 
+          type="text" 
+          name="newMessage" 
+          [(ngModel)]="newMessage" 
+          [placeholder]="'Message ' + activeChat + '...'" 
+          class="form-input chat-input" 
+          autocomplete="off"
+          [disabled]="!isConnected"
+        />
+        <button type="submit" class="btn-send" [disabled]="!newMessage.trim() || !isConnected">
+          Send ➔
+        </button>
+      </form>
+    </footer>
+  </main>
+
+  <!-- Welcome Screen Template -->
+  <ng-template #welcomeScreen>
+    <section class="welcome-screen">
+      <div class="welcome-card glass-panel">
+        <span class="welcome-logo">🔒</span>
+        <h2>End-to-End Encrypted DMs</h2>
+        <p>Choose a friend from the sidebar or search by username to start a private, secure conversation.</p>
+        <span class="welcome-badge">UChat Security Protocol v1.0</span>
+      </div>
+    </section>
+  </ng-template>
+</div>

@@ -40,20 +40,38 @@ public class AuthController {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(loginRequest.getUsername());
 
-        return ResponseEntity.ok(new AuthResponse(jwt, loginRequest.getUsername(), "Login successful"));
+        User user = userRepository.findByUsername(loginRequest.getUsername()).orElseThrow();
+
+        return ResponseEntity.ok(new AuthResponse(jwt, loginRequest.getUsername(), "Login successful", user.getPublicKey(), user.getEncryptedPrivateKey()));
     }
 
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@RequestBody AuthRequest signUpRequest) {
-        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
+        String username = signUpRequest.getUsername();
+        if (username == null || username.trim().isEmpty() || username.length() < 3 || username.contains(" ")) {
             return ResponseEntity
                     .badRequest()
-                    .body(new AuthResponse(null, signUpRequest.getUsername(), "Error: Username is already taken!"));
+                    .body(new AuthResponse(null, username, "Error: Username must be at least 3 characters and contain no spaces!"));
+        }
+
+        if (userRepository.existsByUsername(username)) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new AuthResponse(null, username, "Error: Username is already taken!"));
+        }
+
+        String password = signUpRequest.getPassword();
+        if (password == null || password.length() < 8 || !password.matches(".*\\d.*") || !password.matches(".*[A-Z].*")) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new AuthResponse(null, username, "Error: Password must be at least 8 characters long, contain at least one digit and one uppercase letter!"));
         }
 
         // Create new user's account
-        User user = new User(signUpRequest.getUsername(),
-                encoder.encode(signUpRequest.getPassword()));
+        User user = new User(username,
+                encoder.encode(password),
+                signUpRequest.getPublicKey(),
+                signUpRequest.getEncryptedPrivateKey());
 
         userRepository.save(user);
 
