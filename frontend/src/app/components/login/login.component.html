@@ -40,6 +40,19 @@
         </div>
       </div>
 
+      <div class="form-group remember-me-group">
+        <label class="checkbox-container">
+          <input 
+            type="checkbox" 
+            id="rememberMe" 
+            name="rememberMe" 
+            [(ngModel)]="rememberMe" 
+          />
+          <span class="checkmark"></span>
+          Remember Me
+        </label>
+      </div>
+
       <div *ngIf="errorMessage" class="error-banner">
         <span class="error-icon">⚠️</span>
         <span class="error-text">{{ errorMessage }}</span>

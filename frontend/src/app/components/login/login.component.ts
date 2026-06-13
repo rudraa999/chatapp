@@ -14,6 +14,7 @@ import { AuthService } from '../../services/auth.service';
 export class LoginComponent {
   username = '';
   password = '';
+  rememberMe = false;
   errorMessage = '';
   isLoading = false;
 
@@ -31,7 +32,7 @@ export class LoginComponent {
     this.isLoading = true;
     this.errorMessage = '';
 
-    this.authService.login(this.username, this.password).subscribe({
+    this.authService.login(this.username, this.password, this.rememberMe).subscribe({
       next: (res) => {
         this.router.navigate(['/chat']);
       },

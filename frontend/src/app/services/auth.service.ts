@@ -92,11 +92,11 @@ export class AuthService {
   }
 
   private async restorePrivateKey(): Promise<void> {
-    let cachedJwk = sessionStorage.getItem('chat_private_key');
-    console.log('[AuthService] Cached private key in sessionStorage present:', !!cachedJwk);
+    let cachedJwk = sessionStorage.getItem('chat_private_key') || localStorage.getItem('chat_private_key');
+    console.log('[AuthService] Cached private key present:', !!cachedJwk);
     
     if (!cachedJwk && this.getToken() && this.getUsername()) {
-      console.log('[AuthService] Private key not in sessionStorage but token exists. Requesting from other tabs...');
+      console.log('[AuthService] Private key not found in storage but token exists. Requesting from other tabs...');
       const sharedJwk = await this.requestPrivateKeyFromOtherTabs();
       if (sharedJwk) {
         cachedJwk = JSON.stringify(sharedJwk);
@@ -126,7 +126,7 @@ export class AuthService {
     }
   }
 
-  login(username: string, password: string): Observable<AuthResponse> {
+  login(username: string, password: string, rememberMe: boolean = false): Observable<AuthResponse> {
     // 1. Derive the PBKDF2 key from password
     return from(this.cryptoService.deriveKeyFromPassword(password, username)).pipe(
       switchMap(passwordKey => {
@@ -139,9 +139,14 @@ export class AuthService {
                 response.encryptedPrivateKey,
                 passwordKey
               );
-              // Save decrypted private key in sessionStorage for refresh persistence
+              // Save decrypted private key for refresh persistence
               const jwk = await window.crypto.subtle.exportKey('jwk', this.userPrivateKey);
-              sessionStorage.setItem('chat_private_key', JSON.stringify(jwk));
+              const jwkStr = JSON.stringify(jwk);
+              
+              if (rememberMe) {
+                localStorage.setItem('chat_private_key', jwkStr);
+              }
+              sessionStorage.setItem('chat_private_key', jwkStr);
 
               localStorage.setItem('chat_token', response.token);
               localStorage.setItem('chat_username', response.username);
@@ -187,6 +192,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem('chat_token');
     localStorage.removeItem('chat_username');
+    localStorage.removeItem('chat_private_key');
     sessionStorage.removeItem('chat_private_key');
     this.userPrivateKey = null;
     this.loggedInUser.next(null);
@@ -206,7 +212,9 @@ export class AuthService {
 
   isLoggedIn(): boolean {
     const hasToken = !!this.getToken();
-    const hasPrivateKey = !!this.getPrivateKey() || !!sessionStorage.getItem('chat_private_key');
+    const hasPrivateKey = !!this.getPrivateKey() || 
+                          !!sessionStorage.getItem('chat_private_key') || 
+                          !!localStorage.getItem('chat_private_key');
     const logged = hasToken && hasPrivateKey;
     console.log('[AuthService] isLoggedIn check:', { hasToken, hasPrivateKey, logged });
     if (!logged && hasToken) {
