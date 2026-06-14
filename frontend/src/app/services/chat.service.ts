@@ -220,7 +220,8 @@ export class ChatService {
   }
 
   summarizeText(text: string): Observable<{ summary: string }> {
-    const aiUrl = this.apiUrl.replace('/chat', '/ai') + '/summarize';
+    const baseApi = this.apiUrl.substring(0, this.apiUrl.lastIndexOf('/chat'));
+    const aiUrl = baseApi + '/ai/summarize';
     return this.http.post<{ summary: string }>(aiUrl, { text });
   }
 
