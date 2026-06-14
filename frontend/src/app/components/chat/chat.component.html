@@ -171,6 +171,17 @@
                 <!-- Plain text message -->
                 <p *ngIf="msg.type === 'CHAT'" class="message-content">{{ msg.content }}</p>
                 
+                <!-- AI Summary Section -->
+                <div *ngIf="msg.type === 'CHAT' && msg.summary" class="ai-summary-wrapper">
+                  <button (click)="msg.id && toggleSummary(msg.id)" class="btn-toggle-summary" [ngClass]="{'expanded': msg.id && expandedSummaries[msg.id]}">
+                    <span class="sparkle-icon">✨</span>
+                    {{ (msg.id && expandedSummaries[msg.id]) ? 'Hide Summary' : 'View AI Summary' }}
+                  </button>
+                  <div *ngIf="msg.id && expandedSummaries[msg.id]" class="ai-summary-card">
+                    <p class="summary-text">{{ msg.summary }}</p>
+                  </div>
+                </div>
+                
                 <!-- File / Image / Video / PDF message -->
                 <div *ngIf="msg.type === 'FILE'" class="file-content-container">
                   <!-- If file metadata is loading -->

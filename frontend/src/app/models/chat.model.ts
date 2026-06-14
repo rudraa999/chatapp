@@ -15,6 +15,7 @@ export interface ChatMessage {
   fileId?: string;
   timestamp?: string;
   type: 'CHAT' | 'JOIN' | 'LEAVE' | 'FILE' | 'DELETE' | 'CLEAR_CHAT';
+  summary?: string;
 }
 
 export interface UserSearchResponse {

@@ -76,7 +76,14 @@ export class ChatService {
             history.map(async (msg) => {
               if ((msg.type === 'CHAT' || msg.type === 'FILE') && msg.content && msg.iv) {
                 try {
-                  msg.content = await this.cryptoService.decryptMessage(msg.content, msg.iv, sharedKey);
+                  const decrypted = await this.cryptoService.decryptMessage(msg.content, msg.iv, sharedKey);
+                  try {
+                    const parsed = JSON.parse(decrypted);
+                    msg.content = parsed.text;
+                    msg.summary = parsed.summary;
+                  } catch (e) {
+                    msg.content = decrypted;
+                  }
                 } catch (e) {
                   msg.content = '[Decryption Failed: Key Mismatch]';
                 }
@@ -100,7 +107,18 @@ export class ChatService {
     if ((msg.type === 'CHAT' || msg.type === 'FILE') && msg.content && msg.iv) {
       const friendUsername = msg.sender === this.authService.getUsername() ? msg.recipient! : msg.sender;
       const sharedKey = await this.getOrCreateSharedKey(friendUsername, friendPublicKeyJwk);
-      msg.content = await this.cryptoService.decryptMessage(msg.content, msg.iv, sharedKey);
+      try {
+        const decrypted = await this.cryptoService.decryptMessage(msg.content, msg.iv, sharedKey);
+        try {
+          const parsed = JSON.parse(decrypted);
+          msg.content = parsed.text;
+          msg.summary = parsed.summary;
+        } catch (e) {
+          msg.content = decrypted;
+        }
+      } catch (e) {
+        msg.content = '[Decryption Failed]';
+      }
     }
     return msg;
   }
@@ -201,12 +219,23 @@ export class ChatService {
     }
   }
 
-  async sendPrivateMessage(recipient: string, recipientPublicKeyJwk: string, content: string): Promise<void> {
+  summarizeText(text: string): Observable<{ summary: string }> {
+    const aiUrl = this.apiUrl.replace('/chat', '/ai') + '/summarize';
+    return this.http.post<{ summary: string }>(aiUrl, { text });
+  }
+
+  async sendPrivateMessage(recipient: string, recipientPublicKeyJwk: string, content: string, summary?: string): Promise<void> {
     const username = this.authService.getUsername();
     if (this.stompClient && this.stompClient.connected && username) {
       try {
         const sharedKey = await this.getOrCreateSharedKey(recipient, recipientPublicKeyJwk);
-        const encrypted = await this.cryptoService.encryptMessage(content, sharedKey);
+        
+        let textToEncrypt = content;
+        if (summary) {
+          textToEncrypt = JSON.stringify({ text: content, summary: summary });
+        }
+        
+        const encrypted = await this.cryptoService.encryptMessage(textToEncrypt, sharedKey);
         
         const chatMessage: ChatMessage = {
           sender: username,

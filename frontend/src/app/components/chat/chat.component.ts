@@ -28,6 +28,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   // Cache for decrypted files: msgId -> file metadata + objectUrl
   decryptedFiles: { [msgId: number]: { url: string, name: string, type: string, size: number, loading?: boolean, error?: boolean } } = {};
+  expandedSummaries: { [msgId: number]: boolean } = {};
 
 
   // Friendship & DMs state
@@ -237,19 +238,38 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   // Send private message
-  sendMessage(): void {
+  async sendMessage(): Promise<void> {
     if (!this.newMessage.trim() || !this.activeChat) return;
+
+    const messageText = this.newMessage.trim();
+    this.newMessage = '';
 
     const friendObj = this.friends.find(f => f.username === this.activeChat);
     if (friendObj && friendObj.publicKey) {
-      this.chatService.sendPrivateMessage(this.activeChat, friendObj.publicKey, this.newMessage.trim());
+      const words = messageText.split(/\s+/).filter(w => w.length > 0);
+      if (words.length > 50) {
+        this.chatService.summarizeText(messageText).subscribe({
+          next: async (res) => {
+            await this.chatService.sendPrivateMessage(this.activeChat!, friendObj.publicKey!, messageText, res.summary);
+          },
+          error: async (err) => {
+            console.error('AI summarization failed, sending original message without summary', err);
+            await this.chatService.sendPrivateMessage(this.activeChat!, friendObj.publicKey!, messageText);
+          }
+        });
+      } else {
+        await this.chatService.sendPrivateMessage(this.activeChat, friendObj.publicKey, messageText);
+      }
     }
-    this.newMessage = '';
 
     // Maintain focus on the input to keep the mobile keyboard open
     setTimeout(() => {
       this.messageInput?.nativeElement?.focus();
     }, 50);
+  }
+
+  toggleSummary(msgId: number): void {
+    this.expandedSummaries[msgId] = !this.expandedSummaries[msgId];
   }
 
   // Trigger file selection
