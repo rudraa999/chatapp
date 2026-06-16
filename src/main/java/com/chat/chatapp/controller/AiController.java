@@ -41,8 +41,18 @@ public class AiController {
         }
 
         try {
+            // Calculate a target word limit for the summary dynamically based on original length
+            String trimmed = text.trim();
+            int wordCount = trimmed.isEmpty() ? 0 : trimmed.split("\\s+").length;
+            int maxSummaryWords = Math.max(8, Math.min(25, wordCount / 5));
+
             // Prepare prompt instructions
-            String prompt = "Summarize the following text in a single, concise paragraph. Keep it brief and focused on the key points:\n\n" + text;
+            String prompt = String.format(
+                "Summarize the following text in a single, extremely brief sentence of at most %d words. " +
+                "Focus ONLY on the core point. Do not use introductory phrases (like 'This message discusses...'). " +
+                "Directly output the summary:\n\n%s",
+                maxSummaryWords, text
+            );
 
             // Structure expected by Gemini:
             // { "contents": [{ "parts": [{"text": "..."}] }] }
