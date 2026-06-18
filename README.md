@@ -206,7 +206,7 @@ Once run, the application serves both the API endpoints and the static SPA asset
 
 ---
 
-## 👨‍💻 Author Skills Showcased
+## 👨‍💻 Skills Showcased
 
 * **End-to-End Cryptography:** Implemented browser-native `SubtleCrypto` primitives, handling raw byte conversions, dynamic symmetric key derivation, asymmetrically negotiated sessions, and local payload sealing.
 * **REST & WebSockets Integration:** Crafted a dual communication layer leveraging both HTTP REST APIs (for authentication, history retrieval, and file uploads) and WebSockets STOMP (for real-time signaling, message delivery, and peer connection).
